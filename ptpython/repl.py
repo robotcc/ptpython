@@ -659,7 +659,7 @@ def enable_deprecation_warnings() -> None:
 
 
 def run_config(
-    repl: PythonInput, config_file: str = "~~/.config/ptpython/config.py"
+    repl: PythonInput, config_file: str = "~/.config/ptpython/config.py"
 ) -> None:
     """
     Execute REPL config file.
