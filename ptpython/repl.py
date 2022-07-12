@@ -17,6 +17,8 @@ import warnings
 from dis import COMPILER_FLAG_NAMES
 from enum import Enum
 from typing import Any, Callable, ContextManager, Dict, Optional
+import subprocess
+import locale
 
 from prompt_toolkit.formatted_text import (
     HTML,
@@ -218,6 +220,33 @@ class PythonRepl(PythonInput):
                 clear_title()
             self._remove_from_namespace()
 
+    def solve_cmd(self, cmd: str) -> str:
+        """
+        Solve a command. python parameter should be startwith '@', all result can be fetched from global namespace.
+        """
+        parts = cmd.split()
+        for i, part in enumerate(parts):
+            if part.startswith("@"):
+                n = part[1:]
+                if n in self.get_locals().keys():
+                    parts[i] = self.get_locals().get(part[1:], "")
+                    cmd = cmd.replace(part, parts[i])
+                elif n in self.get_globals().keys():
+                    parts[i] = self.get_globals().get(part[1:], "")
+                    cmd = cmd.replace(part, parts[i])
+
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        stdout = stdout.decode(locale.getpreferredencoding())
+        stderr = stderr.decode(locale.getpreferredencoding())
+        self.get_globals()["__last_cmd"] = cmd
+        self.get_globals()["__last_stdout"] = stdout
+        self.get_globals()["__last_stderr"] = stderr
+        self.get_globals()["__last_return"] = p.returncode
+        print(stdout)
+        print(stderr)
+        return cmd
+
     def eval(self, line: str) -> object:
         """
         Evaluate the line and print the result.
@@ -229,7 +258,8 @@ class PythonRepl(PythonInput):
 
         if line.lstrip().startswith("!"):
             # Run as shell command
-            os.system(line[1:])
+            self.solve_cmd(line[1:])
+            
         else:
             # Try eval first
             try:
@@ -269,7 +299,7 @@ class PythonRepl(PythonInput):
 
         if line.lstrip().startswith("!"):
             # Run as shell command
-            os.system(line[1:])
+            self.solve_cmd(line[1:])
         else:
             # Try eval first
             try:
@@ -629,7 +659,7 @@ def enable_deprecation_warnings() -> None:
 
 
 def run_config(
-    repl: PythonInput, config_file: str = "~/.config/ptpython/config.py"
+    repl: PythonInput, config_file: str = "~~/.config/ptpython/config.py"
 ) -> None:
     """
     Execute REPL config file.
